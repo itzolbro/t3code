@@ -9,8 +9,8 @@ T3 Code has one server-side observability model:
 - traces and metrics can also be exported over OTLP to a real backend like Grafana LGTM
 
 The local trace file is the persisted source of truth for normal local launches. Those launches do not
-write a separate server log file, but SSH-managed launches also persist the remote process's
-stdout/stderr at `~/.t3/ssh-launch/<state>/server.log`.
+write a separate server log file. (SSH-managed launches — removed in the Pi Tie fork — also persisted
+the remote process's stdout/stderr at `~/.t3/ssh-launch/<state>/server.log`.)
 
 ## Where To Find Things
 
@@ -21,7 +21,7 @@ Logs are human-facing:
 - destination: stdout
 - format: `Logger.consolePretty()`
 - normal local persistence: none
-- SSH-managed launch persistence: `~/.t3/ssh-launch/<state>/server.log`
+- SSH-managed launch persistence (removed in the Pi Tie fork): `~/.t3/ssh-launch/<state>/server.log`
 
 If you want a log message to show up in the trace file, emit it inside an active span with `Effect.log...`. `Logger.tracerLogger` will attach it as a span event.
 
@@ -541,8 +541,8 @@ Current high-value span and metric boundaries include:
 
 ### Current Constraints
 
-- logs outside spans are not persisted in the trace file; SSH-managed launch stdout/stderr is still
-  captured in its launcher log
+- logs outside spans are not persisted in the trace file; SSH-managed launch stdout/stderr was captured
+  in its launcher log (SSH-managed launch removed in the Pi Tie fork)
 - metrics are not snapshotted locally
 - the old `serverLogPath` still exists in config for compatibility, but the trace file is the primary
   structured persisted artifact

@@ -12,8 +12,8 @@ the task commands.
   Also serves the built web app.
 - `apps/web` (`@t3tools/web`): React + Vite UI. Consumes the shared client runtime and adds routing,
   components, and web-specific platform layers.
-- `apps/desktop` (`@t3tools/desktop`): Electron shell. Supervises a desktop-scoped `t3` backend,
-  loads the web bundle over the `t3code://` protocol, and owns SSH-managed remote environments.
+- `apps/desktop` (`@t3tools/desktop`): Electron shell. Supervises a desktop-scoped `t3` backend and
+  loads the web bundle over the `t3code://` protocol.
 - `apps/mobile` (`@t3tools/mobile`): Expo/React Native client. Same client runtime composition as
   web, different platform layer and UI.
 - `apps/marketing` (`@t3tools/marketing`): Astro marketing site.
@@ -23,31 +23,20 @@ the task commands.
 - `packages/contracts` (`@t3tools/contracts`): shared Effect Schema definitions. RPC group,
   orchestration commands/events/read model, auth scopes, environment descriptors, settings.
 - `packages/shared` (`@t3tools/shared`): framework-agnostic utilities used by server and clients
-  (`DrainableWorker`, git and source-control helpers, relay auth and signing, DPoP, semver, logging,
+  (`DrainableWorker`, git and source-control helpers, semver, logging,
   observability, and more).
 - `packages/client-runtime` (`@t3tools/client-runtime`): connection lifecycle, authorization, RPC
   session, environment registry, and Atom-based domain state shared by web and mobile. See its
   [README](../../packages/client-runtime/README.md).
-- `packages/ssh` (`@t3tools/ssh`): SSH config parsing, auth prompts, command execution, and the
-  tunnel/environment manager behind desktop-managed SSH environments.
-- `packages/tailscale` (`@t3tools/tailscale`): Tailscale CLI wrapper, including the
-  `ensureTailscaleServe` / `disableTailscaleServe` serve lifecycle the server drives.
 - `packages/effect-acp` (`effect-acp`): Effect client and agent implementation of the Agent Client
   Protocol, used by ACP-speaking provider drivers.
 - `packages/effect-codex-app-server` (`effect-codex-app-server`): Effect client for the
   `codex app-server` JSON-RPC protocol.
 
-## infra
-
-- `infra/relay` (`t3code-relay`): the hosted T3 Connect relay, deployed with Alchemy. Handles
-  environment discovery, cloud-side records, and mobile notifications. It is not in the hot path;
-  after connect, client traffic goes directly to the environment. See
-  [t3-connect.md](./t3-connect.md).
-
 ## Other top-level directories
 
 - `scripts/`: workspace tooling run through `vp run`. Dev runner, desktop artifact builds, release
-  helpers, mobile static checks and showcase capture, update-manifest merging.
+  helpers, update-manifest merging.
 - `assets/`: brand and app icon sources per channel (`dev`, `nightly`, `prod`).
 - `patches/`: pnpm patches for pinned upstream dependencies.
 - `oxlint-plugin-t3code/`: repo-specific lint rules.

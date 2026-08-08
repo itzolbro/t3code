@@ -2,6 +2,11 @@
 
 > For maintainers. Using T3 Code? See [docs/user](../user/).
 
+> **Status: partially superseded.** The Phase 2a cloud-stack removal deleted the
+> relay/T3 Connect connection surfaces from this fork. Sections describing relay
+> targets, relay token handling, and progressive relay discovery are retained as
+> historical upstream reference.
+
 The connection runtime is shared by web and mobile. It owns connectivity,
 authentication, retries, transport lifetime, cached environment data, and
 environment-scoped operations.

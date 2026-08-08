@@ -2,6 +2,10 @@
 
 > For maintainers. Using T3 Code? See [docs/user](../user/).
 
+> **Status: partially superseded.** The Phase 2a cloud-stack removal deleted the
+> relay/T3 Connect surfaces from this fork. The `relay:read`/`relay:write` scopes
+> and relay-managed tunnel sections below are historical upstream reference.
+
 The environment server and the relay use separate credentials, issuers, and trust
 boundaries. They intentionally use a similar OAuth-shaped model so that permission
 checks and token exchange behavior can be audited against established concepts.

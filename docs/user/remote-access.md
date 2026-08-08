@@ -1,5 +1,10 @@
 # Remote Access
 
+> **Status: partially superseded.** The Phase 2a cloud-stack removal deleted the
+> Tailscale, desktop-managed SSH launch, and hosted `app.t3.codes` pairing
+> surfaces from this fork. The Tailscale and SSH sections below are historical
+> upstream reference; local LAN pairing still applies.
+
 Use this when you want to connect to a T3 Code server from another device such as a phone, tablet, or separate desktop app.
 
 ## Quick Pairing for a Running Server

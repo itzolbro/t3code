@@ -2,8 +2,15 @@
 
 > For maintainers. Using T3 Code? See [docs/user](../user/).
 
-Remote environments are shipped, not planned. Direct, bearer-paired, relay-tunneled, Tailscale, and
-desktop-managed SSH access all exist today. This document describes the model they share and where
+> **Status: partially superseded.** The Phase 2a cloud-stack removal deleted the
+> relay/T3 Connect, Tailscale, and desktop-managed SSH surfaces from this fork
+> (`@t3tools/ssh`, `@t3tools/tailscale`, relay client/contracts, `t3 connect`,
+> `t3 pair --tailscale`, `t3 serve --tailscale-serve`). This document is retained
+> as upstream reference; only the local and bearer-paired model still applies.
+
+Remote environments are shipped, not planned. Direct and bearer-paired access
+exist today (relay-tunneled, Tailscale, and desktop-managed SSH access were
+removed in the Pi Tie fork). This document describes the model they share and where
 each piece lives. For the user-facing setup guide see
 [remote access](../user/remote-access.md).
 

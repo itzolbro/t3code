@@ -182,7 +182,7 @@ const capabilitiesLayer = Layer.effectContext(
         if (session === null) {
           return yield* new ConnectionBlockedError({
             reason: "authentication",
-            detail: "Sign in to T3 Connect to connect this environment.",
+            detail: "Relay-managed environments are unavailable in this build.",
           });
         }
         const token = yield* session.readClerkToken().pipe(
@@ -197,7 +197,7 @@ const capabilitiesLayer = Layer.effectContext(
         if (token === null) {
           return yield* new ConnectionBlockedError({
             reason: "authentication",
-            detail: "The T3 Connect session is unavailable.",
+            detail: "The relay session is unavailable.",
           });
         }
         return token;

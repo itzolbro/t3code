@@ -133,6 +133,48 @@ break the build, so they go with the provider-boundary refactor.
 
 ### Phase 2 — pi driver (replace provider/orchestration boundary)
 
+**2a done in this commit (cloud stack removed):**
+
+1. Deleted Clerk from desktop (`DesktopClerk` + preload bridge + passkey packaging)
+   and web (`ClerkProvider`, `components/clerk/`, `components/cloud/`, cloud auth
+   controllers, vite `@clerk` entries); removed `@clerk/*` from pnpm catalog,
+   overrides, minimumReleaseAgeExclude, packageExtensions; `.env.example` cleared.
+2. Deleted `packages/ssh` + desktop ssh consumers (remote-T3 runner, ssh IPC,
+   `DesktopSshEnvironment`), `packages/tailscale` + consumers (`server.ts`
+   tailscaleServeLayer, `cli/pair.ts` --tailscale, `DesktopServerExposure`
+   tailnet path, `dev-share`), and all WSL special cases (`apps/desktop/src/wsl/`,
+   WSL branches in `DesktopBackendConfiguration`, WSL IPC/splash).
+3. Deleted T3 Connect / relay: `cli/connect.ts`, shared/contracts `relayClient`,
+   `relayAuth`, web relay UI (`src/cloud/` relay files, `routes/connect*`),
+   relay-only `apps/server/src/cloud/*` (relayTracing, ManagedEndpointRuntime,
+   CliTokenManager, CliState, cliAuthHtml, publicConfig, config, environmentKeys,
+   http) and `scripts/lib/public-config.ts` relay OTLP plumbing. Kept non-relay
+   infra for 2b: `selfUpdate`, `pinnedRuntime`, `serviceLauncherClient`,
+   `servicePreflight`, `serviceProtocol`, `bootService`.
+4. Stripped `release.yml` relay/Clerk deploy jobs (kept desktop release pipeline)
+   and `ci.yml` clerk grep; docs runbooks updated.
+5. Local-only auth preserved untouched: `apps/server/src/auth/EnvironmentAuth.ts`
+   (bearer-access-token sessions) byte-identical — 2b wires spawn-time issuance.
+6. `pnpm install` green (lockfile pruned), typecheck 0 errors across all 8
+   packages, desktop smoke-test passed, targeted tests green. Pre-existing
+   Windows env failures confirmed at baseline and NOT regressions:
+   `relayClient.test.ts` (deleted), `logging.test.ts` (deleted),
+   `bootService.test.ts` (4, elevated-privilege install),
+   `DesktopBackendConfiguration.test.ts` resource-monitor path-separator (fixed
+   in-harness: expected path now built with the same `Path.Path` join the
+   resolution uses).
+
+**Known residuals (documented, type-valid, deferred):** desktop `DesktopServerExposure`
+tailscale _settings persistence_ surface (server ignores it), web WSL/tailscale
+settings UI (`ConnectionsSettings`, `desktopWslState`, CommandPalette), and the
+client-runtime relay chain (`relay/`, `connection/`, `contracts/relay.ts`) which
+the connection layer statically requires — retained via `apps/web/src/lib/relayRuntime.ts`
+shim; revisit in 2b/4.
+
+**2b remaining (this phase):** new pi driver (`PiProcess`, `PiSessionManager`,
+`PiTranscriptAdapter`, `PiProviderRegistry`) wired into `ws.ts`; pi replaces all
+existing providers; one long-lived pi process, `RemoteSession` per thread.
+
 1. New package `packages/pi-driver` (or `apps/server/src/pi/*`):
    - `PiProcess.ts` — spawn `pi` (resolved binary; dev = `node dist/cli.js`, prod = packaged
      binary), env passthrough, stdout/stderr capture, readiness via health/`rpc-entry`.

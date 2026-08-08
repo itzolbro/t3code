@@ -10,9 +10,9 @@ import * as DesktopBackendPool from "../../backend/DesktopBackendPool.ts";
 import * as ElectronWindow from "../../electron/ElectronWindow.ts";
 import { getLocalEnvironmentBootstraps, getWindowFullscreenState } from "./window.ts";
 
-const readyWslConfig: DesktopBackendManager.DesktopBackendStartConfig = {
-  executablePath: "wsl.exe",
-  args: ["-d", "Ubuntu", "--", "node", "/app/bin.mjs"],
+const readyConfig: DesktopBackendManager.DesktopBackendStartConfig = {
+  executablePath: "backend.exe",
+  args: ["--", "node", "/app/bin.mjs"],
   entryPath: "/app/bin.mjs",
   cwd: "/app",
   env: {},
@@ -30,15 +30,14 @@ const readyWslConfig: DesktopBackendManager.DesktopBackendStartConfig = {
   httpBaseUrl: new URL("http://127.0.0.1:3774"),
   captureOutput: true,
   preflightFailure: Option.none(),
-  runningDistro: "Ubuntu",
 };
 
-const defaultWslInstance: DesktopBackendManager.DesktopBackendInstance = {
-  id: DesktopBackendManager.BackendInstanceId("wsl:default"),
-  label: Effect.succeed("WSL (default distro)"),
+const secondaryInstance: DesktopBackendManager.DesktopBackendInstance = {
+  id: DesktopBackendManager.BackendInstanceId("secondary"),
+  label: Effect.succeed("Secondary"),
   start: Effect.void,
   stop: () => Effect.void,
-  currentConfig: Effect.succeed(Option.some(readyWslConfig)),
+  currentConfig: Effect.succeed(Option.some(readyConfig)),
   snapshot: Effect.succeed({
     desiredRunning: true,
     ready: true,
@@ -50,34 +49,34 @@ const defaultWslInstance: DesktopBackendManager.DesktopBackendInstance = {
 };
 
 describe("getLocalEnvironmentBootstraps", () => {
-  it.effect("publishes the concrete running distro without replacing the stable instance id", () =>
+  it.effect("publishes a ready secondary backend bootstrap with its instance id", () =>
     Effect.gen(function* () {
       const result = yield* getLocalEnvironmentBootstraps.handler();
 
       assert.deepEqual(result, [
         {
-          id: "wsl:default",
-          label: "WSL (Ubuntu)",
-          runningDistro: "Ubuntu",
+          id: "secondary",
+          label: "Secondary",
+          runningDistro: null,
           httpBaseUrl: "http://127.0.0.1:3774/",
           wsBaseUrl: "ws://127.0.0.1:3774/",
           bootstrapToken: "bootstrap-token",
         },
       ]);
-    }).pipe(Effect.provide(DesktopBackendPool.layerTest([defaultWslInstance]))),
+    }).pipe(Effect.provide(DesktopBackendPool.layerTest([secondaryInstance]))),
   );
 
   it.effect("publishes a pending bootstrap only while a transient retry is scheduled", () => {
     const retryingConfig: DesktopBackendManager.DesktopBackendStartConfig = {
-      ...readyWslConfig,
+      ...readyConfig,
       preflightFailure: Option.some({
-        reason: "WSL probe timed out",
+        reason: "backend probe timed out",
         fatal: false,
         retryLimit: 12,
       }),
     };
     const retryingInstance: DesktopBackendManager.DesktopBackendInstance = {
-      ...defaultWslInstance,
+      ...secondaryInstance,
       currentConfig: Effect.succeed(Option.some(retryingConfig)),
       snapshot: Effect.succeed({
         desiredRunning: true,
@@ -92,8 +91,8 @@ describe("getLocalEnvironmentBootstraps", () => {
       const result = yield* getLocalEnvironmentBootstraps.handler();
       assert.deepEqual(result, [
         {
-          id: "wsl:default",
-          label: "WSL (default distro)",
+          id: "secondary",
+          label: "Secondary",
           runningDistro: null,
           httpBaseUrl: null,
           wsBaseUrl: null,
@@ -104,12 +103,12 @@ describe("getLocalEnvironmentBootstraps", () => {
 
   it.effect("omits a bounded transient bootstrap after retries stop", () => {
     const stoppedInstance: DesktopBackendManager.DesktopBackendInstance = {
-      ...defaultWslInstance,
+      ...secondaryInstance,
       currentConfig: Effect.succeed(
         Option.some({
-          ...readyWslConfig,
+          ...readyConfig,
           preflightFailure: Option.some({
-            reason: "WSL probe timed out",
+            reason: "backend probe timed out",
             fatal: false,
             retryLimit: 12,
           }),

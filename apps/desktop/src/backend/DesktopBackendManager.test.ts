@@ -1241,7 +1241,7 @@ describe("DesktopBackendManager", () => {
           spawnerLayer,
           config: {
             ...baseConfig,
-            preflightFailure: Option.some({ reason: "wslpath conversion failed", fatal: false }),
+            preflightFailure: Option.some({ reason: "entry path conversion failed", fatal: false }),
           },
           onPreflightFailed: (failure) =>
             Effect.sync(() => {
@@ -1272,7 +1272,7 @@ describe("DesktopBackendManager", () => {
           config: {
             ...baseConfig,
             preflightFailure: Option.some({
-              reason: "WSL toolchain probe timed out",
+              reason: "backend toolchain probe timed out",
               fatal: false,
               retryLimit: 3,
             }),
@@ -1288,7 +1288,7 @@ describe("DesktopBackendManager", () => {
         assert.deepEqual(failures, []);
 
         yield* TestClock.adjust(Duration.seconds(1));
-        assert.deepEqual(failures, ["WSL toolchain probe timed out"]);
+        assert.deepEqual(failures, ["backend toolchain probe timed out"]);
       }).pipe(Effect.provide(TestClock.layer())),
     ),
   );
