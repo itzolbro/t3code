@@ -72,6 +72,7 @@ import { ProviderInstanceRegistryMutableLayer } from "./ProviderInstanceRegistry
  */
 export const deriveProviderInstanceConfigMap = (
   settings: ServerSettings,
+  includePi = false,
 ): ProviderInstanceConfigMap => {
   const merged: Record<string, ProviderInstanceConfig> = { ...settings.providerInstances };
 
@@ -100,6 +101,13 @@ export const deriveProviderInstanceConfigMap = (
     };
   }
 
+  if (includePi && !("pi" in merged)) {
+    merged.pi = {
+      driver: "pi" as ProviderInstanceConfig["driver"],
+      config: {},
+    };
+  }
+
   return merged as ProviderInstanceConfigMap;
 };
 
@@ -121,7 +129,7 @@ const SettingsWatcherLive = Layer.effectDiscard(
     yield* serverSettings.streamChanges.pipe(
       Stream.runForEach((next) =>
         mutator
-          .reconcile(deriveProviderInstanceConfigMap(next))
+          .reconcile(deriveProviderInstanceConfigMap(next, true))
           .pipe(
             Effect.catchCause((cause) =>
               Effect.logError("ProviderInstanceRegistry reconcile failed", cause),
@@ -162,7 +170,7 @@ export const ProviderInstanceRegistryHydrationLive: Layer.Layer<
     const initialConfigMap =
       initialSettings === undefined
         ? ({} as ProviderInstanceConfigMap)
-        : deriveProviderInstanceConfigMap(initialSettings);
+        : deriveProviderInstanceConfigMap(initialSettings, true);
 
     const mutableLayer = ProviderInstanceRegistryMutableLayer({
       drivers: BUILT_IN_DRIVERS,

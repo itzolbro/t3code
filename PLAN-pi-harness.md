@@ -171,25 +171,57 @@ client-runtime relay chain (`relay/`, `connection/`, `contracts/relay.ts`) which
 the connection layer statically requires — retained via `apps/web/src/lib/relayRuntime.ts`
 shim; revisit in 2b/4.
 
-**2b remaining (this phase):** new pi driver (`PiProcess`, `PiSessionManager`,
-`PiTranscriptAdapter`, `PiProviderRegistry`) wired into `ws.ts`; pi replaces all
-existing providers; one long-lived pi process, `RemoteSession` per thread.
+**2b done in this commit (pi driver):**
 
-1. New package `packages/pi-driver` (or `apps/server/src/pi/*`):
-   - `PiProcess.ts` — spawn `pi` (resolved binary; dev = `node dist/cli.js`, prod = packaged
-     binary), env passthrough, stdout/stderr capture, readiness via health/`rpc-entry`.
-   - `PiSessionManager.ts` — map t3code `ThreadId` ↔ pi session (cwd, model, thinking level);
-     start via `RemoteSession.create(client, {cwd, model, thinkingLevel})`, open existing via
-     `RemoteSession.open(client, id)`.
-   - `PiTranscriptAdapter.ts` — `RemoteSessionState`/`session_progress` →
-     t3code thread/turn/message shapes so the existing React chat UI renders unchanged.
-   - `PiProviderRegistry.ts` — bridge existing provider UI (model picker) to pi
-     `setModel`/`setThinking`; keep the sandbox/approval policy layer, delegating to pi
-     permission modes.
-2. Wire the driver into `ws.ts`: `orchestration.dispatchCommand` etc. now route to
-   pi sessions; `subscribeThread` streams transcript snapshots from `RemoteSession.subscribe`.
-3. Keep terminal/checkpointing/vcs/review as-is where pi doesn't own that surface
-   (or defer review/vcs to v2 and stub).
+1. Added `@earendil-works/pi-coding-agent@0.84.1` (with `@google/genai` + `protobufjs`
+   build approvals). Verified pi's actual surface: `RemoteSession` lives at the
+   `/client` subpath and expects an internal byte transport, so the driver uses
+   pi's **official JSONL RPC** (`dist/rpc-entry.js`) instead of reverse-engineering
+   that transport.
+2. New `apps/server/src/pi/*`:
+   - `PiProcess.ts` — one long-lived pi RPC child (`rpc-entry.js` via node, or
+     `$PI_BINARY` override), JSONL stdin/stdout framing, response correlation,
+     **readiness retry loop** (pi drops early stdin writes while extensions load;
+     ~43s first-answer on this machine), child-exit failure propagation,
+     scoped shutdown.
+   - `PiSessionManager.ts` — `ThreadId` ↔ pi session map (`new_session` /
+     `switch_session` / `prompt` / `abort` / `set_model` / `set_thinking_level`),
+     per-thread command routing, event fan-out correlated by session file.
+   - `PiTranscriptAdapter.ts` — pi RPC events (`message_update`, `turn_*`,
+     `tool_execution_*`, `error`) → provider-runtime event shapes, pure + tested.
+   - `provider/Drivers/PiDriver.ts` — pi as a `ProviderDriver`: snapshot/adapter/
+     textGeneration shapes; adapter routes startSession/sendTurn/interruptTurn/
+     stopSession to the session manager; approval forms + rollback return typed
+     "unsupported" (deferred per plan); textGeneration stubs fail with typed
+     errors (deferred).
+3. Registered pi in `BUILT_IN_DRIVERS` (kept legacy drivers registered for
+   migration/tests, but hydration **synthesizes a `pi` instance on every boot**),
+   wired `PiSessionManager.layer` into `server.ts`, provided a test double in
+   provider tests.
+4. **Repaired a latent 6e4171c0 breakage** the Phase-2a server "typecheck" missed
+   (that run used the wrong package name `@t3tools/server` — the package is `t3`):
+   removed the orphaned `EnvironmentConnectHttpApi` group from
+   `packages/contracts/src/environmentHttp.ts` (its implementation was deleted in
+   2a, leaving ~219 type errors + ~87 runtime test failures) and made
+   `tailscaleServeEnabled`/`tailscaleServePort` optional in
+   `DesktopBackendBootstrap`. Full-repo typecheck now 0 errors via the real root
+   command (`vp run -r typecheck`).
+5. Verification: full-repo typecheck 0 errors; server suite 1694 pass / 129 fail
+   vs baseline 1602 pass / 216 fail on the same machine (net -87 failures; the
+   remaining failures are pre-existing env issues: Claude CLI absent, spawner
+   probes, drive-letter PATH simulation in providerMaintenance tests, elevated-
+   privilege bootService). New pi tests (5) pass, including a **real-child e2e**
+   (`PiProcess.e2e.test.ts` — spawns pi, answers `get_state`, ~43s). Desktop
+   smoke-test passes with pi wired into the runtime.
+6. Known behavior to revisit in integration/3: pi writes its session store
+   under the spawning cwd (`.claude-work-test/` — gitignored); per-thread
+   `--session-dir`/cwd policy should be tuned when wiring thread sessions.
+
+**2b remaining (integration):** wire `ws.ts` orchestration routing so
+`dispatchCommand`/`subscribeThread` actually drive pi sessions end-to-end
+(startSession → prompt → transcript stream into the React chat UI), resolve the
+provider-UI model picker to `set_model`, and map approval policy to pi permission
+modes.
 
 ### Phase 3 — Embed the pi TUI (opencode-style bridge)
 

@@ -13,6 +13,7 @@ import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 import * as CodexErrors from "effect-codex-app-server/errors";
+import { ThreadId } from "@t3tools/contracts";
 import {
   ClaudeSettings,
   CodexSettings,
@@ -51,6 +52,7 @@ import type { ProviderInstance } from "../ProviderDriver.ts";
 import * as ProviderInstanceRegistry from "../Services/ProviderInstanceRegistry.ts";
 import * as ProviderRegistry from "../Services/ProviderRegistry.ts";
 import { makeManualOnlyProviderMaintenanceCapabilities } from "../providerMaintenance.ts";
+import * as PiSessionManager from "../../pi/PiSessionManager.ts";
 const decodeServerSettings = Schema.decodeSync(ServerSettings);
 const encodeServerSettings = Schema.encodeSync(ServerSettings);
 const encodedDefaultServerSettings = encodeServerSettings(DEFAULT_SERVER_SETTINGS);
@@ -60,6 +62,31 @@ const defaultCodexSettings: CodexSettings = Schema.decodeSync(CodexSettings)({})
 const decodeCodexSettings = Schema.decodeSync(CodexSettings);
 const disabledCodexSettings: CodexSettings = Schema.decodeSync(CodexSettings)({
   enabled: false,
+});
+
+// The pi driver is registered as a built-in driver and the hydration layer
+// synthesizes a `pi` instance on boot, which requires `PiSessionManager`.
+// These tests exercise legacy provider behaviors, so a passive test double
+// satisfies the requirement without spawning a pi process.
+const PiSessionManagerTestLayer = Layer.succeed(PiSessionManager.PiSessionManager, {
+  create: (threadId: ThreadId) =>
+    Effect.succeed({
+      threadId,
+      sessionPath: `/tmp/pi-test-${threadId}.jsonl`,
+      cwd: "/tmp",
+    }),
+  open: (threadId: ThreadId) =>
+    Effect.succeed({
+      threadId,
+      sessionPath: `/tmp/pi-test-${threadId}.jsonl`,
+      cwd: "/tmp",
+    }),
+  submit: () => Effect.void,
+  abort: () => Effect.void,
+  setModel: () => Effect.void,
+  setThinking: () => Effect.void,
+  get: () => Effect.succeed(undefined),
+  events: Stream.empty,
 });
 
 process.env.T3CODE_CURSOR_ENABLED = "1";
@@ -1470,6 +1497,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsModule.layerTest(), Te
           yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void));
           const providerRegistryLayer = ProviderRegistryLive.pipe(
             Layer.provideMerge(ProviderInstanceRegistryHydrationLive),
+            Layer.provideMerge(PiSessionManagerTestLayer),
             Layer.provideMerge(
               Layer.succeed(ServerSettingsModule.ServerSettingsService, serverSettings),
             ),
@@ -1563,6 +1591,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsModule.layerTest(), Te
           yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void));
           const providerRegistryLayer = ProviderRegistryLive.pipe(
             Layer.provideMerge(ProviderInstanceRegistryHydrationLive),
+            Layer.provideMerge(PiSessionManagerTestLayer),
             Layer.provideMerge(
               Layer.succeed(ServerSettingsModule.ServerSettingsService, serverSettings),
             ),
@@ -1685,6 +1714,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsModule.layerTest(), Te
           yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void));
           const providerRegistryLayer = ProviderRegistryLive.pipe(
             Layer.provideMerge(ProviderInstanceRegistryHydrationLive),
+            Layer.provideMerge(PiSessionManagerTestLayer),
             Layer.provideMerge(
               Layer.succeed(ServerSettingsModule.ServerSettingsService, serverSettings),
             ),
@@ -1747,6 +1777,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsModule.layerTest(), Te
             yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void));
             const providerRegistryLayer = ProviderRegistryLive.pipe(
               Layer.provideMerge(ProviderInstanceRegistryHydrationLive),
+              Layer.provideMerge(PiSessionManagerTestLayer),
               Layer.provideMerge(
                 Layer.succeed(ServerSettingsModule.ServerSettingsService, serverSettings),
               ),
@@ -1808,6 +1839,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsModule.layerTest(), Te
                 "cursor",
                 "grok",
                 "opencode",
+                "pi",
               ]);
               assert.strictEqual(cursorProvider?.enabled, false);
               assert.strictEqual(cursorProvider?.status, "disabled");
