@@ -136,6 +136,13 @@ export const PiDriver: ProviderDriver<PiSettings, PiDriverEnv> = {
               .pipe(
                 Effect.mapError((cause) => mapAdapterError(cause, "startSession", input.threadId)),
               );
+            const model = input.modelSelection?.model;
+            if (model !== undefined && model.trim().length > 0) {
+              yield* manager.setModel(input.threadId, model).pipe(
+                Effect.mapError((cause) => mapAdapterError(cause, "setModel", input.threadId)),
+                Effect.ignore,
+              );
+            }
             const createdAt = yield* now;
             const next = session(input, instanceId, createdAt);
             active.set(input.threadId, next);
@@ -146,6 +153,15 @@ export const PiDriver: ProviderDriver<PiSettings, PiDriverEnv> = {
             const message = input.input;
             if (!message) {
               return yield* unsupported("sendTurn", input.threadId);
+            }
+            // Model picker integration: apply the requested model before the
+            // turn so the provider UI's selection reaches pi's set_model.
+            const model = input.modelSelection?.model;
+            if (model !== undefined && model.trim().length > 0) {
+              yield* manager.setModel(input.threadId, model).pipe(
+                Effect.mapError((cause) => mapAdapterError(cause, "setModel", input.threadId)),
+                Effect.ignore,
+              );
             }
             yield* manager
               .submit(input.threadId, message)

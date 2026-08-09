@@ -9,10 +9,17 @@ import * as Result from "effect/Result";
 
 import { PiProcess, type PiRpcRequest, type PiRpcResponse } from "./PiProcess.ts";
 
+export interface PiModelRef {
+  readonly provider: string;
+  readonly modelId: string;
+}
+
 interface PiSession {
   readonly threadId: ThreadId;
   readonly sessionPath: string;
   readonly cwd: string;
+  /** Last model slug applied via set_model; undefined until first set. */
+  readonly model?: string | undefined;
 }
 
 export interface PiSessionManagerShape {
@@ -30,10 +37,10 @@ export interface PiSessionManagerShape {
     message: string,
   ) => Effect.Effect<void, PiSessionManagerError>;
   readonly abort: (threadId: ThreadId) => Effect.Effect<void, PiSessionManagerError>;
+  /** Apply a model by slug, resolving provider/modelId via get_available_models. */
   readonly setModel: (
     threadId: ThreadId,
-    provider: string,
-    modelId: string,
+    modelSlug: string,
   ) => Effect.Effect<void, PiSessionManagerError>;
   readonly setThinking: (
     threadId: ThreadId,
@@ -76,9 +83,21 @@ const sessionPath = (response: PiRpcResponse): string => {
   return typeof candidate === "string" ? candidate : "";
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
 const make = Effect.gen(function* () {
   const process = yield* PiProcess;
   const sessions = yield* Ref.make<Map<ThreadId, PiSession>>(new Map());
+  // pi's RPC process hosts exactly ONE active session: `new_session` and
+  // `switch_session` swap the current session, and every subsequent event
+  // (message_update, turn_*, tool_*) belongs to that session. Track the
+  // thread that last activated the session so events can be attributed
+  // without a session identifier (pi's streaming events carry none).
+  const activeThread = yield* Ref.make<ThreadId | undefined>(undefined);
+  // Model catalog cache — refresh once per process lifetime; pi's model set
+  // only changes when config changes (which requires a process restart).
+  let modelCatalog: ReadonlyArray<{ readonly provider: string; readonly modelId: string }> = [];
 
   const request = (threadId: ThreadId, operation: string, input: Record<string, unknown>) =>
     process
@@ -115,16 +134,63 @@ const make = Effect.gen(function* () {
       }),
     );
 
+  const setSessionModel = (threadId: ThreadId, model: string | undefined) =>
+    Ref.update(sessions, (known) => {
+      const session = known.get(threadId);
+      if (!session) return known;
+      const next = new Map(known);
+      next.set(threadId, { ...session, ...(model === undefined ? {} : { model }) });
+      return next;
+    });
+
+  const loadModelCatalog = Effect.gen(function* () {
+    if (modelCatalog.length > 0) return modelCatalog;
+    const response = yield* process.request<PiRpcResponse>({
+      id: "pi-models",
+      type: "get_available_models",
+    });
+    const data = responseData(response);
+    const models = Array.isArray(data.models) ? data.models : [];
+    const resolved: Array<{ readonly provider: string; readonly modelId: string }> = [];
+    for (const entry of models) {
+      if (!isRecord(entry)) continue;
+      const provider = typeof entry.provider === "string" ? entry.provider : "";
+      const modelId = typeof entry.id === "string" ? entry.id : "";
+      if (provider.length > 0 && modelId.length > 0) {
+        resolved.push({ provider, modelId });
+      }
+    }
+    modelCatalog = resolved;
+    return resolved;
+  }).pipe(
+    Effect.mapError(
+      (cause) =>
+        new PiSessionManagerError({
+          operation: "models",
+          threadId: "unknown" as ThreadId,
+          detail: String(cause),
+          cause,
+        }),
+    ),
+  );
+
   const create = (threadId: ThreadId, cwd: string) =>
     request(threadId, "create", { type: "new_session" }).pipe(
-      Effect.map((response) => ({
-        threadId,
-        sessionPath: sessionPath(response),
-        cwd,
-      })),
+      // `new_session` only reports whether a session switch was cancelled;
+      // the session identity (file + id) comes from `get_state`.
+      Effect.flatMap(() =>
+        request(threadId, "create-state", { type: "get_state" }).pipe(
+          Effect.map((response) => ({
+            threadId,
+            sessionPath: sessionPath(response),
+            cwd,
+          })),
+        ),
+      ),
       Effect.tap((session) =>
         Ref.update(sessions, (known) => new Map(known).set(threadId, session)),
       ),
+      Effect.tap(() => Ref.set(activeThread, threadId)),
     );
 
   const open = (threadId: ThreadId, path: string, cwd: string) =>
@@ -133,6 +199,7 @@ const make = Effect.gen(function* () {
       Effect.tap((session) =>
         Ref.update(sessions, (known) => new Map(known).set(threadId, session)),
       ),
+      Effect.tap(() => Ref.set(activeThread, threadId)),
     );
 
   const command = (threadId: ThreadId, operation: string, input: Record<string, unknown>) =>
@@ -141,13 +208,42 @@ const make = Effect.gen(function* () {
       Effect.asVoid,
     );
 
+  const setModel = (threadId: ThreadId, modelSlug: string) =>
+    Effect.gen(function* () {
+      const catalog = yield* loadModelCatalog;
+      // Accept "provider/model" slugs and bare model ids. Prefer an exact
+      // catalog match on id, then provider-prefixed, then first entry.
+      const normalized = modelSlug.trim();
+      const exact =
+        catalog.find((entry) => entry.modelId === normalized) ??
+        catalog.find((entry) => `${entry.provider}/${entry.modelId}` === normalized);
+      const model = exact ?? catalog[0];
+      if (!model) {
+        return yield* Effect.fail(
+          new PiSessionManagerError({
+            operation: "setModel",
+            threadId,
+            detail: `pi reports no available models; cannot apply '${modelSlug}'`,
+          }),
+        );
+      }
+      yield* request(threadId, "setModel", {
+        type: "set_model",
+        provider: model.provider,
+        modelId: model.modelId,
+      });
+      yield* setSessionModel(threadId, normalized);
+    });
+
   return {
     create,
     open,
-    submit: (threadId, message) => command(threadId, "submit", { type: "prompt", message }),
+    submit: (threadId, message) =>
+      command(threadId, "submit", { type: "prompt", message }).pipe(
+        Effect.tap(() => Ref.set(activeThread, threadId)),
+      ),
     abort: (threadId) => command(threadId, "abort", { type: "abort" }),
-    setModel: (threadId, provider, modelId) =>
-      command(threadId, "setModel", { type: "set_model", provider, modelId }),
+    setModel,
     setThinking: (threadId, level) =>
       command(threadId, "setThinking", { type: "set_thinking_level", level }),
     get: (threadId) => Ref.get(sessions).pipe(Effect.map((known) => known.get(threadId))),
@@ -162,17 +258,10 @@ const make = Effect.gen(function* () {
           }),
       ),
       Stream.mapEffect((event) =>
-        Ref.get(sessions).pipe(
-          Effect.flatMap((known) => {
-            const eventSession =
-              asRecord(event.data)?.sessionFile ?? asRecord(event.data)?.sessionId;
-            const match = [...known.values()].find(
-              (session) => session.sessionPath === eventSession,
-            );
-            return Effect.succeed(
-              match ? Result.succeed({ threadId: match.threadId, event }) : Result.failVoid,
-            );
-          }),
+        Ref.get(activeThread).pipe(
+          Effect.map((threadId) =>
+            threadId ? Result.succeed({ threadId, event }) : Result.failVoid,
+          ),
         ),
       ),
       Stream.filterMap((value) => value),

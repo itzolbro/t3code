@@ -111,20 +111,27 @@ const make = Effect.gen(function* () {
       Effect.andThen(Ref.set(responses, new Map())),
     );
 
-  const writeRequests = Stream.fromQueue(requests).pipe(
-    Stream.mapEffect(([line]) =>
-      Stream.run(Stream.encodeText(Stream.make(line)), child.stdin).pipe(
-        Effect.mapError(
-          (cause) =>
-            new PiProcessError({
-              operation: "write",
-              detail: "Could not write to pi stdin",
-              cause,
-            }),
-        ),
-      ),
+  // One long-lived writer: the queue stream feeds child.stdin for the whole
+  // process lifetime. Running a *fresh* `Stream.run` per request on the same
+  // `fromWritable` sink deadlocks (the writable is shared), so the queue is
+  // consumed by a single drain instead.
+  const writeRequests = Stream.run(
+    Stream.fromQueue(requests).pipe(
+      Stream.tap(([line]) => Effect.logInfo("stdin write", { line })),
+      Stream.map(([line]) => line),
+      Stream.encodeText,
     ),
-    Stream.runDrain,
+    child.stdin,
+  ).pipe(
+    Effect.mapError(
+      (cause) =>
+        new PiProcessError({
+          operation: "write",
+          detail: "Could not write to pi stdin",
+          cause,
+        }),
+    ),
+    Effect.ignore,
     Effect.forkScoped,
   );
 
@@ -139,11 +146,17 @@ const make = Effect.gen(function* () {
           Effect.forEach(lines, (line) => {
             const message = parseLine(line.replace(/\r$/, ""));
             if (!message) return Effect.void;
-            if (message.id) {
+            // Responses (correlated by id) are pi's answers to our requests.
+            // Everything else — streaming events, extension UI requests —
+            // fans out to the events queue even when it carries an id
+            // (tool calls, UI requests), so consumers see the full stream.
+            if (message.type === "response" && message.id) {
               return Ref.get(responses).pipe(
                 Effect.flatMap((pending) => {
                   const deferred = pending.get(message.id!);
-                  if (!deferred) return Effect.void;
+                  if (!deferred) {
+                    return Effect.void;
+                  }
                   return Deferred.succeed(deferred, message).pipe(
                     Effect.andThen(
                       Ref.update(responses, (current) => {
