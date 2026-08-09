@@ -38,3 +38,4 @@ node_modules/
 
 # pi test-runner state (pi stores sessions under cwd when spawned from a repo)
 .claude-work-test
+~/.pi/
