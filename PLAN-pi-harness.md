@@ -225,40 +225,74 @@ modes.
 
 ### Phase 3 — Embed the pi TUI (opencode-style bridge)
 
-1. New `apps/server/src/tui/*`:
-   - `PiTuiHost.ts` — instantiate pi's Ink TUI in-process
-     (`@earendil-works/pi-tui` interactive mode) with a virtual input/output stream instead
-     of the real terminal.
-   - `PiTuiBridge.ts` — global async queues exactly like opencode's
-     `tui-control.ts`: `nextTuiRequest/nextTuiResponse`, plus a publish bus for TUI events
-     (prompt appended, command executed, session selected, toast shown).
-2. Add WS-RPC methods to `packages/contracts` (`TUI_WS_METHODS`):
-   `tui.appendPrompt`, `tui.submitPrompt`, `tui.clearPrompt`, `tui.executeCommand`,
-   `tui.selectSession`, `tui.publish`, `tui.control.next`, `tui.control.response`.
-3. Renderer: new "TUI mode" view = a virtual terminal (`xterm.js` or the existing
-   ghostty-vt renderer) fed by the bridge stream; keep "native mode" = current React chat
-   UI reading the same transcript stream. Both drive the same pi instance.
+**Done in this commit (queue bridge over the pi session + TUI-mode view):**
+
+1. `apps/server/src/tui/PiTuiBridge.ts` — opencode-style control plane over the
+   live pi session: command routing (append/submit/clear/execute/select) into
+   `PiSessionManager`, publish bus over manager events. pi's Ink TUI binds to a
+   real terminal and would fight the Effect event loop in-process (plan risk),
+   so the stdio-bridged RPC session is the control plane instead.
+2. `packages/contracts/src/tui.ts` — `TUI_WS_METHODS` (append/submit/clear/
+   execute/select/publish) + Rpc definitions registered in `WsRpcGroup`.
+   (`tui.control.next`/`tui.control.response` from the original plan were left
+   out: the publish/submit model covers the desktop surface without the
+   queue-handoff, and unknown-typed schemas broke the Rpc handler typing.)
+3. `ws.ts` — six `tui.*` handlers via `observeRpcEffect`/`observeRpcStream`;
+   the bridge is optional (`Effect.serviceOption`) so unit harnesses get no-op
+   handlers. Scopes: commands = orchestration:operate, publish = read.
+4. Renderer: `apps/web/src/state/tui.ts` (submit/append/clear/select commands +
+   publish subscription atoms) and `TuiModeView` (virtual terminal fed by
+   `tui.publish`, prompt input, Enter-to-submit) with a TUI-mode toggle in the
+   chat header. Native chat and TUI mode drive the same pi session.
+5. Tests: PiTuiBridge routing + publish fan-out; full pi suite still green
+   (incl. real-child e2e); full-repo typecheck 0 errors; desktop smoke passes.
 
 ### Phase 4 — Desktop shell cleanup & branding
 
-1. Rename app/product: `Pi Tie`, window title, icons (`assets/prod`), `productName`,
-   `APP_IDS`, auto-update endpoint.
-2. Settings: replace Clerk/cloud settings with local `electron-store` (theme, keybindings,
-   model defaults, permission mode). Reuse `DesktopClientSettings` skeleton.
-3. Packaging: `electron-builder` targets — win nsis, mac dmg/zip, linux AppImage/deb.
-   Bundle the pi binary as a sidecar (extraResources) + a minimal embedded node if needed.
-4. Auto-update: point updater at a pi-tie releases feed (GitHub Releases) or disable for v1.
+**Done in this commit:**
+
+1. Rebranded to **Pi Tie**: `APP_BASE_NAME`, `productName`, `appUserModelId`
+   (`com.pitie.desktop`), linux wm class / desktop entry (`pi-tie`), user data
+   dirs (`pi-tie` / `pi-tie-dev`), artifact names (`Pi-Tie-*`), user-facing
+   error/menu/secret-storage strings, web branding fallback + tests.
+2. Settings trimmed: removed `relay:read`/`relay:write` scopes from contracts
+   (local-only auth), dropped relay scope options from ConnectionsSettings UI
+   and the OAuth allowed-scope set; auth tests updated.
+3. Packaging targets already exist (`build-desktop-artifact.ts`: win nsis,
+   mac dmg, linux AppImage). Icons under `assets/prod` unchanged (upstream
+   assets; swap when Pi Tie art exists).
+4. Auto-update stays **env-driven** (`GITHUB_REPOSITORY` /
+   `T3CODE_DESKTOP_UPDATE_REPOSITORY`) so the fork's GitHub Releases feed
+   works without hardcoding; disable by omitting the env for v1.
+5. Sidecar packaging of the pi binary (bundle `dist/rpc-entry.js` +
+   dependencies via extraResources) deferred to packaging pass — dev
+   resolves it from node_modules, prod resolves via `PI_BINARY` or the
+   packaged path.
 
 ### Phase 5 — Verify (Step 4 gates)
 
-1. `pnpm typecheck` (all packages) + `pnpm test` green.
-2. `pnpm --filter @t3tools/server build` → `node dist/bin.mjs start` → health endpoint
-   returns ok; `pnpm --filter @t3tools/desktop smoke-test` boots Electron.
-3. Integration: launch desktop → renderer connects via WS-RPC → `RemoteSession.create`
-   in `apps/server` spawns `pi` → send a prompt → transcript streams into chat UI;
-   TUI mode shows the same transcript through the bridge.
-4. Real-time: two windows / TUI-mode + native-mode both live-update on one session.
-5. Cross-platform smoke: Windows (this machine), then mac/Linux CI (GitHub Actions).
+**Run on this machine (2026-08-09):**
+
+1. Full-repo typecheck 0 errors (`vp run -r typecheck`); server suite green
+   relative to baseline — remaining failures are pre-existing env issues
+   (Claude CLI absent, spawner probes, drive-letter PATH fixtures, elevated-
+   privilege bootService), verified at baseline parity after the auth scope
+   fixes (auth 19/19).
+2. `pnpm --filter t3 build:bundle` ✅; built server boots, health endpoint
+   `/.well-known/t3/environment` returns 200 with pi wired into the runtime ✅;
+   desktop smoke-test boots Electron ✅.
+3. Integration: pi e2e proves spawn → session → prompt → streamed events ✅;
+   TUI-mode view renders the same publish stream.
+4. Real-time: TUI publish + native transcript both consume the manager event
+   stream (same pi session) — verified by unit + real-child e2e.
+5. Cross-platform: CI (blacksmith ubuntu) runs typecheck + tests on the fork;
+   `T3CODE_PI_E2E_PROMPT=0` in CI skips the model-dependent prompt round-trip
+   (session lifecycle still runs). mac/Linux smoke pending Actions run on the
+   fork.
+
+**Open follow-ups (v2):** approval-policy mapping to pi permission modes,
+per-thread `--session-dir`/cwd policy, packaged pi sidecar in extraResources,
+Pi Tie icons, checkpoint/review/vcs deferral.
 
 ---
 

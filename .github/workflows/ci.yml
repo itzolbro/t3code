@@ -86,6 +86,9 @@ jobs:
         env:
           T3CODE_TRANSFER_BUDGET_REPORT_PATH: ${{ runner.temp }}/t3code-transfer-budget.md
           T3CODE_TRANSFER_BUDGET_RESULT_PATH: ${{ runner.temp }}/thread-transfer-result.json
+          # CI has no pi model credentials; the pi e2e prompt round-trip needs
+          # a reachable model, so it is skipped (session lifecycle still runs).
+          T3CODE_PI_E2E_PROMPT: "0"
         run: vp run test
 
       - name: Publish transfer budget report

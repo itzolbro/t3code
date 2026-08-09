@@ -10,6 +10,11 @@ import { ThreadId } from "@t3tools/contracts";
 import * as PiProcess from "./PiProcess.ts";
 import * as PiSessionManager from "./PiSessionManager.ts";
 
+// The prompt round-trip needs a reachable pi model. CI has no API keys, so
+// `T3CODE_PI_E2E_PROMPT` opts the prompt test in; the session-lifecycle test
+// (create + get_state) runs everywhere. Locally both run by default.
+const runPromptE2E = process.env.T3CODE_PI_E2E_PROMPT !== "0";
+
 describe("PiSessionManager (real child)", () => {
   it.effect(
     "creates a session, applies a model, and receives streamed events after a prompt",
@@ -32,19 +37,22 @@ describe("PiSessionManager (real child)", () => {
           .pipe(Effect.timeout(Duration.minutes(3)));
 
         // pi streams agent/turn events after the prompt is accepted; the
-        // first event may take a while (model cold start).
-        let sawActivity = false;
-        for (let i = 0; i < 36; i += 1) {
-          const next = yield* Queue.take(events).pipe(
-            Effect.timeout(Duration.seconds(5)),
-            Effect.orElseSucceed(() => undefined),
-          );
-          if (next) {
-            sawActivity = true;
-            break;
+        // first event may take a while (model cold start). Skipped in CI
+        // where no model is configured (T3CODE_PI_E2E_PROMPT=0).
+        if (runPromptE2E) {
+          let sawActivity = false;
+          for (let i = 0; i < 36; i += 1) {
+            const next = yield* Queue.take(events).pipe(
+              Effect.timeout(Duration.seconds(5)),
+              Effect.orElseSucceed(() => undefined),
+            );
+            if (next) {
+              sawActivity = true;
+              break;
+            }
           }
+          expect(sawActivity).toBe(true);
         }
-        expect(sawActivity).toBe(true);
       }).pipe(
         Effect.provide(
           PiSessionManager.layer.pipe(
