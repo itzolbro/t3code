@@ -66,18 +66,35 @@ const parseLine = (line: string): PiRpcResponse | undefined => {
 const READINESS_ATTEMPTS = 12;
 const READINESS_DELAY = "5 seconds";
 
+// Resolve pi's RPC entry across runtimes:
+// - packaged: import.meta.resolve walks from the bundled server's URL to the
+//   staged node_modules (app.asar.unpacked) — pi's exports map is
+//   import-only, so CJS createRequire cannot resolve it.
+// - dev/vitest: the Vite transform may not support import.meta.resolve the
+//   same way, so fall back to the repo-relative node_modules path.
+const PI_RPC_ENTRY_SPECIFIER = "@earendil-works/pi-coding-agent/rpc-entry";
+
+function resolvePiRpcEntry(): string {
+  try {
+    const resolved = import.meta.resolve(PI_RPC_ENTRY_SPECIFIER);
+    if (typeof resolved === "string" && resolved.startsWith("file:")) {
+      return NodeURL.fileURLToPath(resolved);
+    }
+  } catch {
+    // fall through to dev path
+  }
+  return NodePath.join(
+    NodePath.dirname(NodeURL.fileURLToPath(import.meta.url)),
+    "../../node_modules/@earendil-works/pi-coding-agent/dist/rpc-entry.js",
+  );
+}
+
 const make = Effect.gen(function* () {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const configuredBinary = process.env.PI_BINARY;
   const binary = configuredBinary ?? process.execPath;
-  const args = configuredBinary
-    ? ["--mode", "rpc"]
-    : [
-        NodePath.join(
-          NodePath.dirname(NodeURL.fileURLToPath(import.meta.url)),
-          "../../node_modules/@earendil-works/pi-coding-agent/dist/rpc-entry.js",
-        ),
-      ];
+  const args = configuredBinary ? ["--mode", "rpc"] : [resolvePiRpcEntry()];
+
   const command = yield* resolveSpawnCommand(binary, args, { env: process.env });
   const child = yield* spawner.spawn(
     ChildProcess.make(command.command, command.args, {
