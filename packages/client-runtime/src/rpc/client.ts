@@ -1,4 +1,4 @@
-import { ORCHESTRATION_WS_METHODS, WS_METHODS } from "@t3tools/contracts";
+import { ORCHESTRATION_WS_METHODS, TUI_WS_METHODS, WS_METHODS } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import type * as Duration from "effect/Duration";
@@ -52,7 +52,8 @@ export type EnvironmentSubscriptionRpcTag =
   | typeof WS_METHODS.subscribeResourceTelemetry
   | typeof WS_METHODS.previewAutomationConnect
   | typeof WS_METHODS.subscribeVcsStatus
-  | typeof WS_METHODS.terminalAttach;
+  | typeof WS_METHODS.terminalAttach
+  | typeof TUI_WS_METHODS.tuiPublish;
 
 export type EnvironmentStreamCommandRpcTag =
   | typeof WS_METHODS.serverUpdateServerWithProgress
@@ -63,7 +64,6 @@ export type EnvironmentStreamRpcTag =
   | EnvironmentStreamCommandRpcTag;
 
 export type EnvironmentUnaryRpcTag = Exclude<EnvironmentRpcTag, EnvironmentStreamRpcTag>;
-
 export interface EnvironmentRpcSubscriptionObservation {
   readonly environmentId: string;
   readonly method: EnvironmentSubscriptionRpcTag;

@@ -119,6 +119,18 @@ import * as VcsProcess from "./vcs/VcsProcess.ts";
 import * as PairingGrantStore from "./auth/PairingGrantStore.ts";
 import * as SessionStore from "./auth/SessionStore.ts";
 import { failEnvironmentAuthInvalid, failEnvironmentInternal } from "./auth/http.ts";
+import * as PiProcess from "./pi/PiProcess.ts";
+import * as PiSessionManager from "./pi/PiSessionManager.ts";
+import * as PiTuiBridge from "./tui/PiTuiBridge.ts";
+import {
+  TUI_WS_METHODS,
+  type TuiAppendPromptInput,
+  type TuiExecuteCommandInput,
+  type TuiSelectSessionInput,
+  type TuiSubmitPromptInput,
+  type TuiCommandResult,
+  type TuiPublishedEvent,
+} from "@t3tools/contracts";
 const isOrchestrationDispatchCommandError = Schema.is(OrchestrationDispatchCommandError);
 
 const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
@@ -376,6 +388,21 @@ const makeWsRpcLayer = (
       const projectSetupScriptRunner = yield* ProjectSetupScriptRunner.ProjectSetupScriptRunner;
       const serverEnvironment = yield* ServerEnvironment.ServerEnvironment;
       const backgroundPolicy = yield* BackgroundPolicy.BackgroundPolicy;
+      // Optional: the pi TUI bridge is only live when the pi runtime layer is
+      // provided (full server runtime). Unit-test harnesses that build the ws
+      // layer with NodeServices only get graceful no-op handlers.
+      const tuiBridge = yield* Effect.serviceOption(PiTuiBridge.PiTuiBridge);
+      const tuiCommands = (
+        command: PiTuiBridge.TuiBridgeCommand,
+      ): Effect.Effect<TuiCommandResult, never> =>
+        Option.match(tuiBridge, {
+          onNone: () => Effect.succeed({ ok: false } satisfies TuiCommandResult),
+          onSome: (bridge) =>
+            bridge.command(command).pipe(
+              Effect.catch(() => Effect.succeed({ ok: false } satisfies TuiCommandResult)),
+              Effect.as({ ok: true } satisfies TuiCommandResult),
+            ),
+        });
       const rpcClientIds = yield* Ref.make(new Set<RpcClientId>());
       yield* Effect.addFinalizer(() =>
         Ref.get(rpcClientIds).pipe(
@@ -2100,6 +2127,66 @@ const makeWsRpcLayer = (
             ),
             { "rpc.aggregate": "server" },
           ),
+        [TUI_WS_METHODS.tuiAppendPrompt]: (input: TuiAppendPromptInput) =>
+          observeRpcEffect(
+            TUI_WS_METHODS.tuiAppendPrompt,
+            tuiCommands({ type: "append", threadId: input.threadId, text: input.text }),
+            { "rpc.aggregate": "tui" },
+          ),
+        [TUI_WS_METHODS.tuiSubmitPrompt]: (input: TuiSubmitPromptInput) =>
+          observeRpcEffect(
+            TUI_WS_METHODS.tuiSubmitPrompt,
+            tuiCommands({ type: "submit", threadId: input.threadId, text: input.text }),
+            { "rpc.aggregate": "tui" },
+          ),
+        [TUI_WS_METHODS.tuiClearPrompt]: (input: { threadId: TuiAppendPromptInput["threadId"] }) =>
+          observeRpcEffect(
+            TUI_WS_METHODS.tuiClearPrompt,
+            tuiCommands({ type: "clear", threadId: input.threadId }),
+            { "rpc.aggregate": "tui" },
+          ),
+        [TUI_WS_METHODS.tuiExecuteCommand]: (input: TuiExecuteCommandInput) =>
+          observeRpcEffect(
+            TUI_WS_METHODS.tuiExecuteCommand,
+            tuiCommands({ type: "execute", threadId: input.threadId, text: input.command }),
+            { "rpc.aggregate": "tui" },
+          ),
+        [TUI_WS_METHODS.tuiSelectSession]: (input: TuiSelectSessionInput) =>
+          observeRpcEffect(
+            TUI_WS_METHODS.tuiSelectSession,
+            tuiCommands({
+              type: "select",
+              threadId: input.threadId,
+              sessionPath: input.sessionPath,
+            }),
+            { "rpc.aggregate": "tui" },
+          ),
+        [TUI_WS_METHODS.tuiPublish]: (_input: Record<string, never>) =>
+          observeRpcStream(
+            TUI_WS_METHODS.tuiPublish,
+            Stream.unwrap(
+              Option.match(tuiBridge, {
+                onNone: () => Effect.succeed(Stream.empty),
+                onSome: (bridge) =>
+                  bridge.published.pipe(
+                    Effect.map((stream) =>
+                      stream.pipe(
+                        Stream.map(
+                          ({ threadId, event }) =>
+                            ({
+                              threadId,
+                              type: String(event.type),
+                              raw: event,
+                            }) satisfies TuiPublishedEvent,
+                        ),
+                        Stream.catchCause(() => Stream.empty),
+                      ),
+                    ),
+                  ),
+              }),
+            ),
+            { "rpc.aggregate": "tui" },
+          ),
       });
     }),
   );
@@ -2129,6 +2216,11 @@ export const websocketRpcRouteLayer = Layer.unwrap(
           Effect.provide(
             makeWsRpcLayer(session, previewAutomationBroker).pipe(
               Layer.provideMerge(RpcSerialization.layerJson),
+              Layer.provideMerge(
+                PiTuiBridge.layer.pipe(
+                  Layer.provide(PiSessionManager.layer.pipe(Layer.provide(PiProcess.layer))),
+                ),
+              ),
               Layer.provide(ProviderMaintenanceRunner.layer),
               Layer.provide(Layer.succeed(ServerSelfUpdate.ServerSelfUpdate, serverSelfUpdate)),
               Layer.provide(

@@ -492,6 +492,7 @@ type ChatViewProps =
       environmentId: EnvironmentId;
       threadId: ThreadId;
       onDiffPanelOpen?: () => void;
+      onToggleTuiMode?: () => void;
       reserveTitleBarControlInset?: boolean;
       forceExpandedMobileComposer?: boolean;
       threadSyncPhase?: ThreadSyncPhase | null;
@@ -502,6 +503,7 @@ type ChatViewProps =
       environmentId: EnvironmentId;
       threadId: ThreadId;
       onDiffPanelOpen?: () => void;
+      onToggleTuiMode?: () => void;
       reserveTitleBarControlInset?: boolean;
       forceExpandedMobileComposer?: boolean;
       threadSyncPhase?: never;
@@ -1172,6 +1174,7 @@ function ChatViewContent(props: ChatViewProps) {
     threadId,
     routeKind,
     onDiffPanelOpen,
+    onToggleTuiMode,
     reserveTitleBarControlInset = true,
     forceExpandedMobileComposer = false,
   } = props;
@@ -6034,6 +6037,16 @@ function ChatViewContent(props: ChatViewProps) {
           )}
         >
           {!rightPanelOpen ? panelLayoutControls : null}
+          {onToggleTuiMode ? (
+            <button
+              type="button"
+              onClick={onToggleTuiMode}
+              className="mr-2 rounded px-2 py-1 text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
+              title="Switch to pi TUI mode"
+            >
+              TUI
+            </button>
+          ) : null}
           <ChatHeader
             activeThreadEnvironmentId={activeThread.environmentId}
             activeThreadId={activeThread.id}

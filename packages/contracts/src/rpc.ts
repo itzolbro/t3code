@@ -45,6 +45,14 @@ import {
   VcsStatusStreamEvent,
 } from "./git.ts";
 import {
+  WsTuiAppendPromptRpc,
+  WsTuiClearPromptRpc,
+  WsTuiExecuteCommandRpc,
+  WsTuiPublishRpc,
+  WsTuiSelectSessionRpc,
+  WsTuiSubmitPromptRpc,
+} from "./tui.ts";
+import {
   ReviewDiffFileContentsInput,
   ReviewDiffFileContentsResult,
   ReviewDiffPreviewError,
@@ -869,4 +877,10 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationGetArchivedShellSnapshotRpc,
   WsOrchestrationSubscribeShellRpc,
   WsOrchestrationSubscribeThreadRpc,
+  WsTuiAppendPromptRpc,
+  WsTuiSubmitPromptRpc,
+  WsTuiClearPromptRpc,
+  WsTuiExecuteCommandRpc,
+  WsTuiSelectSessionRpc,
+  WsTuiPublishRpc,
 );

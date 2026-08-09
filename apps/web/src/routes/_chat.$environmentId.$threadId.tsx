@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import ChatView from "../components/ChatView";
 import { threadHasStarted } from "../components/ChatView.logic";
+import { TuiModeView } from "../components/TuiModeView";
 import { finalizePromotedDraftThreadByRef, useComposerDraftStore } from "../composerDraftStore";
 import { resolveThreadRouteRef, resolveThreadRouteRenderState } from "../threadRoutes";
 import { resolveThreadSyncPhase } from "../threadSync";
@@ -18,6 +19,7 @@ import { environmentShell } from "../state/shell";
 
 function ChatThreadRouteView() {
   const navigate = useNavigate();
+  const [tuiMode, setTuiMode] = useState(false);
   const threadRef = Route.useParams({
     select: (params) => resolveThreadRouteRef(params),
   });
@@ -81,12 +83,21 @@ function ChatThreadRouteView() {
   return (
     <SidebarInset className="h-svh min-h-0 overflow-hidden overscroll-y-none bg-background text-foreground md:h-dvh">
       {renderState === "ready" || (renderState === "loading" && serverThreadShell !== null) ? (
-        <ChatView
-          environmentId={threadRef.environmentId}
-          threadId={threadRef.threadId}
-          routeKind="server"
-          threadSyncPhase={threadSyncPhase}
-        />
+        tuiMode ? (
+          <TuiModeView
+            environmentId={threadRef.environmentId}
+            threadId={threadRef.threadId}
+            onExitTuiMode={() => setTuiMode(false)}
+          />
+        ) : (
+          <ChatView
+            environmentId={threadRef.environmentId}
+            threadId={threadRef.threadId}
+            routeKind="server"
+            threadSyncPhase={threadSyncPhase}
+            onToggleTuiMode={() => setTuiMode(true)}
+          />
+        )
       ) : null}
     </SidebarInset>
   );

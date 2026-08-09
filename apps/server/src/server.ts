@@ -351,6 +351,8 @@ const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
   // with explicit `providerInstances` entries on boot.
   Layer.provideMerge(ProviderInstanceRegistryHydrationLive),
   Layer.provideMerge(PiSessionManager.layer.pipe(Layer.provide(PiProcess.layer))),
+  // PiTuiBridge is provided at the ws layer level (optional there); the
+  // runtime merge would drag PiSessionManager into every CLI test harness.
   // Shared native/canonical NDJSON writers used by both the per-instance
   // drivers (native stream, written from inside each `<X>Adapter`) and
   // `ProviderService` (canonical stream, written after event normalization).

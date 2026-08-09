@@ -5,6 +5,7 @@ import {
   AuthReviewWriteScope,
   AuthTerminalOperateScope,
   ORCHESTRATION_WS_METHODS,
+  TUI_WS_METHODS,
   type AuthEnvironmentScope,
   WS_METHODS,
   WsRpcGroup,
@@ -99,6 +100,14 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.subscribeServerLifecycle]: AuthOrchestrationReadScope,
   [WS_METHODS.subscribeAuthAccess]: AuthAccessReadScope,
   [WS_METHODS.subscribeBackgroundPolicy]: AuthOrchestrationReadScope,
+  // Pi TUI bridge — driving the local pi session requires operate scope;
+  // observing the publish stream is read-only.
+  [TUI_WS_METHODS.tuiAppendPrompt]: AuthOrchestrationOperateScope,
+  [TUI_WS_METHODS.tuiSubmitPrompt]: AuthOrchestrationOperateScope,
+  [TUI_WS_METHODS.tuiClearPrompt]: AuthOrchestrationOperateScope,
+  [TUI_WS_METHODS.tuiExecuteCommand]: AuthOrchestrationOperateScope,
+  [TUI_WS_METHODS.tuiSelectSession]: AuthOrchestrationOperateScope,
+  [TUI_WS_METHODS.tuiPublish]: AuthOrchestrationReadScope,
 } as const satisfies Readonly<Record<WsRpcMethod, AuthEnvironmentScope>>;
 
 export function requiredScopeForRpcMethod(method: string): AuthEnvironmentScope {
