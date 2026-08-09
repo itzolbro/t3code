@@ -4,8 +4,6 @@ import {
   AuthStandardClientScopes,
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
-  AuthRelayReadScope,
-  AuthRelayWriteScope,
   AuthReviewWriteScope,
   AuthTerminalOperateScope,
   EnvironmentAuthInvalidError,
@@ -266,8 +264,6 @@ export const authHttpApiLayer = HttpApiBuilder.group(
                       AuthReviewWriteScope,
                       AuthAccessReadScope,
                       AuthAccessWriteScope,
-                      AuthRelayReadScope,
-                      AuthRelayWriteScope,
                     ]),
                   });
             if (requestedScopes === null) {
