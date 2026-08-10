@@ -86,6 +86,7 @@ const PiSessionManagerTestLayer = Layer.succeed(PiSessionManager.PiSessionManage
   setModel: () => Effect.void,
   setThinking: () => Effect.void,
   get: () => Effect.succeed(undefined),
+  listModels: Effect.succeed([]),
   events: Stream.empty,
 });
 

@@ -1,13 +1,6 @@
-import {
-  ClaudeSettings,
-  CodexSettings,
-  CursorSettings,
-  GrokSettings,
-  OpenCodeSettings,
-  ProviderDriverKind,
-} from "@t3tools/contracts";
-import type * as Schema from "effect/Schema";
-import { ClaudeAI, CursorIcon, GrokIcon, type Icon, OpenAI, OpenCodeIcon } from "../Icons";
+import { ProviderDriverKind } from "@t3tools/contracts";
+import * as Schema from "effect/Schema";
+import { PiIcon, type Icon } from "../Icons";
 
 type ProviderSettingsSchema = {
   readonly fields: Readonly<Record<string, Schema.Top>>;
@@ -34,38 +27,21 @@ export interface ProviderClientDefinition {
   readonly badgeLabel?: string;
 }
 
+/**
+ * Pi Tie is a pi-only harness — pi is the only provider. The settings schema
+ * mirrors `PiDriver.configSchema` in the server (`model`, `thinkingLevel`).
+ */
+const PiSettings = Schema.Struct({
+  model: Schema.optional(Schema.String),
+  thinkingLevel: Schema.optional(Schema.String),
+});
+
 export const PROVIDER_CLIENT_DEFINITIONS: readonly ProviderClientDefinition[] = [
   {
-    value: ProviderDriverKind.make("codex"),
-    label: "Codex",
-    icon: OpenAI,
-    settingsSchema: CodexSettings,
-  },
-  {
-    value: ProviderDriverKind.make("claudeAgent"),
-    label: "Claude",
-    icon: ClaudeAI,
-    settingsSchema: ClaudeSettings,
-  },
-  {
-    value: ProviderDriverKind.make("cursor"),
-    label: "Cursor",
-    icon: CursorIcon,
-    badgeLabel: "Early Access",
-    settingsSchema: CursorSettings,
-  },
-  {
-    value: ProviderDriverKind.make("grok"),
-    label: "Grok",
-    icon: GrokIcon,
-    badgeLabel: "Early Access",
-    settingsSchema: GrokSettings,
-  },
-  {
-    value: ProviderDriverKind.make("opencode"),
-    label: "OpenCode",
-    icon: OpenCodeIcon,
-    settingsSchema: OpenCodeSettings,
+    value: ProviderDriverKind.make("pi"),
+    label: "Pi",
+    icon: PiIcon,
+    settingsSchema: PiSettings,
   },
 ];
 

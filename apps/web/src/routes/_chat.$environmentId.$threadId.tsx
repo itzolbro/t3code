@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import ChatView from "../components/ChatView";
 import { threadHasStarted } from "../components/ChatView.logic";
+import { PiStatusBar } from "../components/PiStatusBar";
 import { TuiModeView } from "../components/TuiModeView";
 import { finalizePromotedDraftThreadByRef, useComposerDraftStore } from "../composerDraftStore";
 import { resolveThreadRouteRef, resolveThreadRouteRenderState } from "../threadRoutes";
@@ -81,24 +82,27 @@ function ChatThreadRouteView() {
   }
 
   return (
-    <SidebarInset className="h-svh min-h-0 overflow-hidden overscroll-y-none bg-background text-foreground md:h-dvh">
-      {renderState === "ready" || (renderState === "loading" && serverThreadShell !== null) ? (
-        tuiMode ? (
-          <TuiModeView
-            environmentId={threadRef.environmentId}
-            threadId={threadRef.threadId}
-            onExitTuiMode={() => setTuiMode(false)}
-          />
-        ) : (
-          <ChatView
-            environmentId={threadRef.environmentId}
-            threadId={threadRef.threadId}
-            routeKind="server"
-            threadSyncPhase={threadSyncPhase}
-            onToggleTuiMode={() => setTuiMode(true)}
-          />
-        )
-      ) : null}
+    <SidebarInset className="flex h-svh min-h-0 flex-col overflow-hidden overscroll-y-none bg-background text-foreground md:h-dvh">
+      <div className="min-h-0 flex-1">
+        {renderState === "ready" || (renderState === "loading" && serverThreadShell !== null) ? (
+          tuiMode ? (
+            <TuiModeView
+              environmentId={threadRef.environmentId}
+              threadId={threadRef.threadId}
+              onExitTuiMode={() => setTuiMode(false)}
+            />
+          ) : (
+            <ChatView
+              environmentId={threadRef.environmentId}
+              threadId={threadRef.threadId}
+              routeKind="server"
+              threadSyncPhase={threadSyncPhase}
+              onToggleTuiMode={() => setTuiMode(true)}
+            />
+          )
+        ) : null}
+      </div>
+      <PiStatusBar />
     </SidebarInset>
   );
 }

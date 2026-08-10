@@ -46,7 +46,7 @@ export type RightPanelSurface =
     }
   | { id: "agents"; kind: "agents" };
 
-const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
+const RIGHT_PANEL_STORAGE_KEY = "pi-tie:right-panel-state:v2";
 // v9 removed the "plan" surface kind (plans render inline in the transcript).
 const RIGHT_PANEL_STORAGE_VERSION = 9;
 

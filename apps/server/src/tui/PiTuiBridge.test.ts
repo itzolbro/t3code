@@ -23,6 +23,7 @@ describe("PiTuiBridge", () => {
       abort: () => Effect.void,
       setModel: () => Effect.void,
       setThinking: () => Effect.void,
+      listModels: Effect.succeed([]),
       get: () => Effect.succeed(undefined),
       events: Stream.empty,
     } satisfies typeof PiSessionManager.Service;
@@ -54,6 +55,7 @@ describe("PiTuiBridge", () => {
       abort: () => Effect.void,
       setModel: () => Effect.void,
       setThinking: () => Effect.void,
+      listModels: Effect.succeed([]),
       get: () => Effect.succeed(undefined),
       events: Stream.fromQueue(queue),
     } satisfies typeof PiSessionManager.Service;

@@ -47,6 +47,16 @@ export interface PiSessionManagerShape {
     level: string,
   ) => Effect.Effect<void, PiSessionManagerError>;
   readonly get: (threadId: ThreadId) => Effect.Effect<PiSession | undefined>;
+  /** Available models (provider/modelId/name + supported thinking levels). */
+  readonly listModels: Effect.Effect<
+    ReadonlyArray<{
+      readonly provider: string;
+      readonly modelId: string;
+      readonly name: string;
+      readonly thinkingLevels: ReadonlyArray<string>;
+    }>,
+    PiSessionManagerError
+  >;
   readonly events: Stream.Stream<
     { readonly threadId: ThreadId; readonly event: PiRpcResponse },
     PiSessionManagerError
@@ -97,7 +107,12 @@ const make = Effect.gen(function* () {
   const activeThread = yield* Ref.make<ThreadId | undefined>(undefined);
   // Model catalog cache — refresh once per process lifetime; pi's model set
   // only changes when config changes (which requires a process restart).
-  let modelCatalog: ReadonlyArray<{ readonly provider: string; readonly modelId: string }> = [];
+  let modelCatalog: ReadonlyArray<{
+    readonly provider: string;
+    readonly modelId: string;
+    readonly name: string;
+    readonly thinkingLevels: ReadonlyArray<string>;
+  }> = [];
 
   const request = (threadId: ThreadId, operation: string, input: Record<string, unknown>) =>
     process
@@ -151,13 +166,31 @@ const make = Effect.gen(function* () {
     });
     const data = responseData(response);
     const models = Array.isArray(data.models) ? data.models : [];
-    const resolved: Array<{ readonly provider: string; readonly modelId: string }> = [];
+    const resolved: Array<{
+      readonly provider: string;
+      readonly modelId: string;
+      readonly name: string;
+      readonly thinkingLevels: ReadonlyArray<string>;
+    }> = [];
     for (const entry of models) {
       if (!isRecord(entry)) continue;
       const provider = typeof entry.provider === "string" ? entry.provider : "";
       const modelId = typeof entry.id === "string" ? entry.id : "";
+      const name = typeof entry.name === "string" ? entry.name : modelId;
       if (provider.length > 0 && modelId.length > 0) {
-        resolved.push({ provider, modelId });
+        // pi's catalog entries carry a thinkingLevelMap ({ level: apiValue })
+        // — the levels the model actually supports (pi-web-ui shows exactly
+        // this: getAvailableThinkingLevels scoped to the current model).
+        const thinkingLevels: string[] = [];
+        const map = asRecord(entry.thinkingLevelMap);
+        if (map) {
+          for (const [level, value] of Object.entries(map)) {
+            if (value !== null && value !== undefined) {
+              thinkingLevels.push(level);
+            }
+          }
+        }
+        resolved.push({ provider, modelId, name, thinkingLevels });
       }
     }
     modelCatalog = resolved;
@@ -247,6 +280,7 @@ const make = Effect.gen(function* () {
     setThinking: (threadId, level) =>
       command(threadId, "setThinking", { type: "set_thinking_level", level }),
     get: (threadId) => Ref.get(sessions).pipe(Effect.map((known) => known.get(threadId))),
+    listModels: loadModelCatalog,
     events: process.events.pipe(
       Stream.mapError(
         (cause) =>
@@ -259,9 +293,18 @@ const make = Effect.gen(function* () {
       ),
       Stream.mapEffect((event) =>
         Ref.get(activeThread).pipe(
-          Effect.map((threadId) =>
-            threadId ? Result.succeed({ threadId, event }) : Result.failVoid,
-          ),
+          Effect.map((threadId) => {
+            // Extension UI requests (setStatus/setWidget/notify from pi's
+            // trackers like subscription-meter / quotas / LSP / goal) are
+            // process-global — surface them even before any thread activates.
+            if (event.type === "extension_ui_request") {
+              return Result.succeed({
+                threadId: threadId ?? ("extension" as ThreadId),
+                event,
+              });
+            }
+            return threadId ? Result.succeed({ threadId, event }) : Result.failVoid;
+          }),
         ),
       ),
       Stream.filterMap((value) => value),

@@ -11,10 +11,10 @@ export const EMBER_THEME_LABEL = "Ember";
 export const IRIS_THEME_ID = "iris" as const;
 export const IRIS_THEME_LABEL = "Iris";
 export const THEME_FILE_VERSION = 1 as const;
-export const CUSTOM_THEMES_STORAGE_KEY = "t3code:themes:v1";
-export const THEME_FOLLOW_SYSTEM_STORAGE_KEY = "t3code:theme-follow-system";
-export const THEME_APPEARANCE_MODE_STORAGE_KEY = "t3code:theme-appearance-mode";
-export const THEME_HALVES_STORAGE_KEY = "t3code:theme-halves:v1";
+export const CUSTOM_THEMES_STORAGE_KEY = "pi-tie:themes:v1";
+export const THEME_FOLLOW_SYSTEM_STORAGE_KEY = "pi-tie:theme-follow-system";
+export const THEME_APPEARANCE_MODE_STORAGE_KEY = "pi-tie:theme-appearance-mode";
+export const THEME_HALVES_STORAGE_KEY = "pi-tie:theme-halves:v1";
 
 const LEGACY_T3_CHAT_DARK_THEME_ID = "t3-chat-dark";
 

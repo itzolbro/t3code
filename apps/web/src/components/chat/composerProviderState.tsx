@@ -9,7 +9,6 @@ import {
   buildProviderOptionSelectionsFromDescriptors,
   getProviderOptionCurrentValue,
   getProviderOptionDescriptors,
-  isClaudeUltrathinkPrompt,
 } from "@t3tools/shared/model";
 import type { ReactNode } from "react";
 
@@ -48,12 +47,14 @@ type TraitsRenderInput = {
   onPromptChange: (prompt: string) => void;
 };
 
-export function getComposerPromptInjectionState(prompt: string): ComposerPromptInjectionState {
-  return isClaudeUltrathinkPrompt(prompt) ? "ultrathink" : "none";
+export function getComposerPromptInjectionState(_prompt: string): ComposerPromptInjectionState {
+  // Pi never injects prompt values (no ultrathink-style modes), so the
+  // composer never takes the injected-prompt styling path.
+  return "none";
 }
 
 export function getComposerProviderState(input: ComposerProviderStateInput): ComposerProviderState {
-  const { provider, model, models, modelOptions, promptInjectionState = "none" } = input;
+  const { provider, model, models, modelOptions } = input;
   const caps = getProviderModelCapabilities(models, model, provider);
   const descriptors = getProviderOptionDescriptors({ caps, selections: modelOptions });
   const primarySelectDescriptor = descriptors.find(
@@ -62,21 +63,11 @@ export function getComposerProviderState(input: ComposerProviderStateInput): Com
   );
   const primaryValue = getProviderOptionCurrentValue(primarySelectDescriptor ?? null);
   const promptEffort = typeof primaryValue === "string" ? primaryValue : null;
-  const ultrathinkActive =
-    (primarySelectDescriptor?.promptInjectedValues?.length ?? 0) > 0 &&
-    promptInjectionState === "ultrathink";
 
   return {
     provider,
     promptEffort,
     modelOptionsForDispatch: buildProviderOptionSelectionsFromDescriptors(descriptors),
-    ...(ultrathinkActive
-      ? {
-          composerFrameClassName: "ultrathink-frame",
-          composerSurfaceClassName: "shadow-[0_0_0_1px_rgba(255,255,255,0.07)_inset]",
-          modelPickerIconClassName: "ultrathink-chroma",
-        }
-      : {}),
   };
 }
 

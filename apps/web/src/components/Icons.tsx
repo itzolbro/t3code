@@ -663,6 +663,20 @@ export const OpenCodeIcon: Icon = (props) => (
   </svg>
 );
 
+/**
+ * Pi mark — the pi-coding-agent brand: a violet rounded square carrying the
+ * white π glyph. Matches the Pi Tie logo / favicon exactly (same geometry,
+ * same `#8b5cf6` accent).
+ */
+export const PiIcon: Icon = (props) => (
+  <svg {...props} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1" y="1" width="22" height="22" rx="5" fill="#8b5cf6" />
+    <rect x="5.6" y="6.4" width="12.8" height="2.4" rx="1.2" fill="#ffffff" />
+    <rect x="6.7" y="8.8" width="2.4" height="8.9" rx="1.2" fill="#ffffff" />
+    <rect x="14.9" y="8.8" width="2.4" height="8.9" rx="1.2" fill="#ffffff" />
+  </svg>
+);
+
 export const GithubCopilotIcon: Icon = ({ className, ...props }) => (
   <svg
     {...props}

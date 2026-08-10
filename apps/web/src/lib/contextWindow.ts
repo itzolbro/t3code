@@ -28,23 +28,11 @@ export type ContextWindowSnapshot = NullableContextWindowUsage & {
 /** Map a provider driver kind to a user-facing display name. */
 export function formatProviderDisplayName(provider: string | null | undefined): string {
   if (!provider) return "This agent";
-  switch (provider) {
-    case "claudeAgent":
-    case "claude":
-      return "Claude";
-    case "codex":
-      return "Codex";
-    case "cursor":
-      return "Cursor";
-    case "opencode":
-      return "OpenCode";
-    default: {
-      // Title-case unknown driver kinds so they read reasonably.
-      const trimmed = provider.replace(/Agent$/i, "").trim();
-      if (trimmed.length === 0) return provider;
-      return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
-    }
-  }
+  // Pi Tie is pi-only; unknown driver kinds title-case so they read
+  // reasonably (e.g. `pi` renders as "Pi").
+  const trimmed = provider.replace(/Agent$/i, "").trim();
+  if (trimmed.length === 0) return provider;
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
 
 export function deriveLatestContextWindowSnapshot(
