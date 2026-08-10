@@ -291,8 +291,25 @@ modes.
    fork.
 
 **Open follow-ups (v2):** approval-policy mapping to pi permission modes,
-per-thread `--session-dir`/cwd policy, packaged pi sidecar in extraResources,
-Pi Tie icons, checkpoint/review/vcs deferral.
+per-thread `--session-dir`/cwd policy, Pi Tie icons,
+checkpoint/review/vcs deferral.
+
+**Packaging (2026-08-09):** `pnpm dist:desktop:win:x64` produces a working
+NSIS installer `release/Pi-Tie-0.0.32-x64.exe` (159 MB, unsigned → SmartScreen
+warning; sign with a cert for distribution). pi ships via the staged prod
+`node_modules` (`app.asar.unpacked/node_modules/@earendil-works/pi-coding-agent`),
+resolved by the bundled server through `import.meta.resolve` +
+`fileURLToPath` (pi's exports map is import-only, so CJS createRequire can't
+resolve it; `import.meta.url`-relative dev paths break in the asar layout).
+Verified end-to-end: silent install → bundled pi answers `get_state` (~95s
+cold boot) → installed `Pi Tie.exe` launches and stays up. Notes:
+- Resource-monitor Rust build needs the MSVC toolchain + vcvars64 env
+  (`rustup default stable-x86_64-pc-windows-msvc`, run build from a VS dev
+  shell); the GNU default toolchain lacks the msvc target.
+- WSL backend won't start without `--wsl-prebuild` (Linux pty.node) — v1 is
+  Windows-primary; WSL is a v2 nicety.
+- macOS/Linux installers: run `dist:desktop:mac` / `dist:desktop:linux` on
+  those hosts (or CI with electron-builder matrix).
 
 ---
 
